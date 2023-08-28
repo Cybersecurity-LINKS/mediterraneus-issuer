@@ -1,10 +1,15 @@
 use deadpool_postgres::Pool;
+use identity_iota::core::FromJson;
+use identity_iota::credential::RevocationBitmap;
 use identity_iota::crypto::{KeyPair, KeyType};
+use identity_iota::did::DID;
+use identity_iota::document::Service;
 use identity_iota::iota::{IotaDocument, IotaIdentityClientExt};
 use identity_iota::prelude::IotaClientExt;
 use identity_iota::verification::{MethodScope, VerificationMethod};
 use iota_client::{Client, block::{address::Address, output::AliasOutput}};
 use iota_client::secret::SecretManager;
+use serde_json::json;
 use crate::db::operations::{self};
 use crate::db::operations::insert_identity_issuer;
 use crate::utils::convert_string_to_iotadid;
@@ -29,6 +34,23 @@ pub async fn create_identity(client: &Client, wallet_address: Address, secret_ma
     let method: VerificationMethod = VerificationMethod::new(document.id().clone(), keypair.type_(), keypair.public(), "#key-1").unwrap();
     document.insert_method(method, MethodScope::VerificationMethod).unwrap();
 
+
+    /* ------------- */
+    // Create a new empty revocation bitmap. No credential is revoked yet.
+    let revocation_bitmap: RevocationBitmap = RevocationBitmap::new();
+
+
+    // Add the revocation bitmap to the DID document of the issuer as a service.
+    let service: Service = Service::from_json_value(json!({
+        "id": document.id().to_url().join("#my-revocation-service").unwrap(),
+        "type": RevocationBitmap::TYPE,
+        "serviceEndpoint": revocation_bitmap.to_endpoint().unwrap()
+    })).unwrap();
+    assert!(document.insert_service(service).is_ok());
+
+    /* ----------- */
+
+
     // Construct an Alias Output containing the DID document, with the wallet address
     // set as both the state controller and governor.
     let alias_output: AliasOutput = client.new_did_output(wallet_address, document, None).await.unwrap();
@@ -36,6 +58,7 @@ pub async fn create_identity(client: &Client, wallet_address: Address, secret_ma
     // Publish the Alias Output and get the published DID document.
     let document: IotaDocument = client.publish_did_output(secret_manager, alias_output).await.unwrap();
     println!("Published DID document: {document:#}");
+
 
     // Insert new identity in the DB
     let new_issuer_identity = Identity { did: document.id().to_string(), privkey: keypair.private().as_ref().to_vec() };

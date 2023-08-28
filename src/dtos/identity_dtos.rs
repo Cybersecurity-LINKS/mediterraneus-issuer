@@ -30,3 +30,7 @@ pub struct VcIssuingResponse {
     pub message: String,
     pub vc: String,
 }
+
+
+
+
