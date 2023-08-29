@@ -21,6 +21,14 @@ cd mediterraneus-issuer-rs/src
 cargo run main
 ```
 
+## Recommendation
+
+When utilizing the Rust GNU toolchain, ensure that the 'rocksdb' feature in iota-wallet is disabled. This can be accomplished by correctly including this dependency in the following manner:
+
+```
+iota-wallet = {version = "1.0.0-rc.6", default-features = false, features = [ "storage", "stronghold" ] }
+```
+
 ## Useful links
 https://github.com/actix/examples/blob/master/databases/postgres/src/main.rs
 
