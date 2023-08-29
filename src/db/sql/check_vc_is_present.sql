@@ -1,0 +1,1 @@
+SELECT * FROM verifiable_credential WHERE id=$1;

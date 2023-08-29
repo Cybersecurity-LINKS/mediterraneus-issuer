@@ -62,3 +62,22 @@ pub async fn insert_vc(client: &Client) -> Result<VerifiableCredential, MyError>
 
     Ok(vc_result)
 }
+
+pub async fn check_vc_is_present(client: &Client, vc_id: i32) -> Result<(), MyError> {
+    let _stmt = include_str!("./sql/check_vc_is_present.sql");
+    // let _stmt = _stmt.replace("$table_fields", &HolderRequest::sql_table_fields());
+    let stmt = client.prepare(&_stmt).await.unwrap();
+
+    let row = client
+            .query(
+                &stmt,
+                &[&vc_id],
+            )
+            .await?;
+
+    if row.is_empty() {
+        Err(MyError::NotFound)
+    } else {
+        Ok(())
+    }
+}

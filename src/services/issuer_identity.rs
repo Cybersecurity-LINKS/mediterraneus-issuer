@@ -66,7 +66,7 @@ pub async fn create_identity(client: &Client, wallet_address: Address, secret_ma
     Ok(new_issuer_identity)
 }  
 
-pub async fn resolve_did(client: Client, holder_did: String) -> Result<IotaDocument, identity_iota::iota::Error> {
+pub async fn resolve_did(client: &Client, holder_did: String) -> Result<IotaDocument, identity_iota::iota::Error> {
     let did = convert_string_to_iotadid(holder_did);
     let resolved_doc = client.resolve_did(&did).await?;
 

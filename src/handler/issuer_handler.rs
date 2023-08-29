@@ -1,10 +1,11 @@
-use actix_web::{web, HttpResponse, Responder, post, get, http::header::ContentType};
+use actix_web::{web, HttpResponse, Responder, post, get, put, http::header::ContentType};
 use deadpool_postgres::Pool;
 use ethers::utils::hex::FromHex;
 use identity_iota::{crypto::Ed25519, core::ToJson};
 use iota_client::crypto::signatures::ed25519::{PublicKey, Signature};
-use crate::{services::{issuer_identity::resolve_did, issuer_vc::create_vc}, 
-            IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::ReqVCInitDTO};
+use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc}}, 
+            IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::{ReqVCInitDTO, ReqVCRevocation}};
+use crate::db::{models::Identity, operations::check_vc_is_present};
 
 /// Store did with expiration so that the client should resend the signatures in a short time.
 /// Expiration allows to maintain a light db.
@@ -26,8 +27,8 @@ async fn create_verifiable_credential(
             let verifiable_credential =  create_vc(
                         req_body.did.clone(), 
                         vc.id, 
-                        issuer_state.issuer_identity.clone(), 
-                        issuer_state.issuer_account.client().clone().to_owned()
+                        &issuer_state.issuer_identity, 
+                        issuer_state.issuer_account.client()
                         ).await;
             match verifiable_credential {
                 Ok(credential) => {
@@ -49,6 +50,33 @@ async fn create_verifiable_credential(
 
 
 // TODO: revoke API (must be admin api to let only issuer revoke a VC)
+#[post("/revoke")]
+async fn revoke_verifiable_credential(
+    vc_id: web::Json<ReqVCRevocation>,
+    pool: web::Data<Pool>,
+    issuer_state: web::Data<IssuerState>) -> impl Responder {
+
+    let check = check_vc_is_present(&pool.get().await.unwrap(), vc_id.vc_id).await;
+
+    let result = match check {
+        Ok(_) => {
+            let sm = issuer_state.secret_manager.read().await;
+            let revoked = revoke_vc(vc_id.vc_id, &issuer_state.issuer_identity, issuer_state.issuer_account.client(), &sm).await;
+            match revoked {
+                Ok(_) => HttpResponse::Ok().body("Credential Revoked!"),
+                Err(e) => HttpResponse::InternalServerError().body(e.to_string())
+            }
+        },
+        Err(_) => HttpResponse::BadRequest().body("Not a valid VC id".to_string())
+    };
+
+
+    // let result = revoke_vc(vc_id.vc_id, &issuer_state.issuer_identity, issuer_state.issuer_account.client());
+    result
+
+}
+
+
 // TODO: verify if credential revoked
 
 
@@ -62,6 +90,7 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
          // prefixes all resources and routes attached to it...
         web::scope("/identity")
             .service(create_verifiable_credential)
+            .service(revoke_verifiable_credential)
             .service(echo_api)
     );
 }

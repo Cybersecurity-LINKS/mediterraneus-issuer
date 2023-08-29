@@ -1,12 +1,14 @@
 use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::Service, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}};
-use iota_client::Client;
+use iota_client::{Client, block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, secret::SecretManager};
 use serde_json::json;
-use crate::db::models::Identity;
+
+
+use crate::{db::models::Identity, errors::my_errors::MyError};
 
 use super::issuer_identity::resolve_did;
 
 
-pub async fn create_vc(holder_did: String, vc_id: i32, issuer_identity: Identity, client: Client) -> Result<Credential, ()> {
+pub async fn create_vc(holder_did: String, vc_id: i32, issuer_identity: &Identity, client: &Client) -> Result<Credential, ()> {
 
     // Create a credential subject indicating the degree earned by Alice.
     let subject: Subject = Subject::from_json_value(json!({
@@ -51,5 +53,23 @@ pub async fn create_vc(holder_did: String, vc_id: i32, issuer_identity: Identity
     .unwrap();
 
     Ok(credential)
+}
+
+
+pub async fn revoke_vc(credential_index: i32, issuer_identity: &Identity, client: &Client, secret_manager_issuer: &SecretManager) -> anyhow::Result<()> {
+
+    let mut issuer_document = resolve_did(client, issuer_identity.did.clone()).await?;
+    let credential_index = credential_index as u32;
+    issuer_document.revoke_credentials("my-revocation-service", &[credential_index])?;
+
+    // Publish the changes.
+    let alias_output: AliasOutput = client.update_did_output(issuer_document.clone()).await?;
+    let rent_structure: RentStructure = client.get_rent_structure().await?;
+    let alias_output: AliasOutput = AliasOutputBuilder::from(&alias_output)
+        .with_minimum_storage_deposit(rent_structure)
+        .finish(client.get_token_supply().await?)?;
+    issuer_document = client.publish_did_output(&secret_manager_issuer, alias_output).await?;
+    
+    Ok(())
 }
 
