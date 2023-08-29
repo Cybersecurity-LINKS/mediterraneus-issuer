@@ -3,7 +3,7 @@
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 ![Iota](https://img.shields.io/badge/iota-29334C?style=for-the-badge&logo=iota&logoColor=white)
 
-Issuer of verifiable credentials using smart contracts to bind the pseudonymous identity with the Self Sovereign Identity. Sample implementation for the Mediterraneus Protocol.
+Issuer of verifiable credentials using the **IOTA Identity** framework. Sample implementation for the Mediterraneus Protocol.
 
 ## Issuer initialization
 The issuer must posses an SSI comprising of at least a DID. At application start up the issuer creates a new identity or retrieves it from the local database. 
