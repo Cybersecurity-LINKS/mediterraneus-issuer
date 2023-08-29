@@ -26,7 +26,5 @@ SignerMiddleware<ethers::providers::Provider<Http>, Wallet<SigningKey>>>;
 pub struct IssuerState {
     pub issuer_account: AccountHandle,
     pub secret_manager: Arc<RwLock<SecretManager>>,
-    pub issuer_identity: Identity,
-    // pub eth_client: Arc<EthClient>,
-    // pub idsc_instance: LocalContractInstance
+    pub issuer_identity: Identity
 }

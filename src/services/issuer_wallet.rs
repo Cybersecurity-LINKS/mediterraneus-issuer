@@ -1,15 +1,10 @@
-use ethers::prelude::{abigen, Contract};
-use ethers::contract::Lazy;
-use ethers::types::Address;
 use iota_wallet::{
     account_manager::AccountManager,
     iota_client::constants::SHIMMER_COIN_TYPE,
     Result, account::AccountHandle,
 };
-use std::{env, path::PathBuf, sync::Arc};
-use crate::LocalContractInstance;
-use crate::utils::get_abi_from_file;
-use crate::{utils::{setup_secret_manager, setup_client_options}, EthClient};
+use std::{env, path::PathBuf};
+use crate::utils::{setup_secret_manager, setup_client_options};
 
 /// creates or loads the issuer's wallet account. It also ensures that the main account address ([0]) has 
 /// funds. Funds are obtained from the faucet. If no funds are given to the account's address 
@@ -45,24 +40,3 @@ pub async fn create_or_load_wallet_account() -> Result<(AccountManager, AccountH
 
     Ok((manager, _account))
 }
-
-
-/// Checks if the idsc_abi.json has been already downloaded, if not the ABI is retrieved and stored locally.
-/// The abigen! macro generates a type-safe binding to an Ethereum smart contract from its ABI (for the IDSC in this case). 
-pub async fn setup_eth_wallet(eth_client: Arc<EthClient>) -> LocalContractInstance {
-    abigen!(IDSC, "$CARGO_MANIFEST_DIR/abi/idsc_abi.json");
-
-    let json_abi: Lazy<ethers::abi::Abi> = Lazy::new(|| {
-        let from_file_abi = get_abi_from_file();
-        if from_file_abi.len() == 0 {
-            panic!("ABI file does not exist or is empty");
-        }        
-        serde_json::from_str(from_file_abi.as_str().clone()).expect("Invalid ABI")
-    });
-
-    let contract_address: Address = env::var("IDENTITY_SC_ADDRESS").unwrap().as_str().parse().unwrap();
-    let idsc_istance = Contract::new(contract_address, json_abi.clone(), eth_client.clone());
-
-    idsc_istance  
-}
-

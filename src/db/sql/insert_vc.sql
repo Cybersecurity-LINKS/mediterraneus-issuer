@@ -1,2 +1,2 @@
-INSERT INTO verifiable_credential
-RETURNING $table_fields;
+INSERT INTO verifiable_credential DEFAULT VALUES
+RETURNING id;

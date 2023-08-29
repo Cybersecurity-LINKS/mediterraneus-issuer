@@ -8,7 +8,6 @@ use serde_json::{self};
 use std::fs::File;
 use std::io::prelude::*;
 
-use crate::dtos::identity_dtos::AbiDTO;
 
 pub fn setup_client_options() -> ClientOptions { 
     dotenv::dotenv().ok();
@@ -110,48 +109,6 @@ pub async fn ensure_address_has_funds(client: &Client, address: Address, faucet_
         log::info!("Address has already enough funds: {}.", balance);
     }
     Ok(())
-  }
-
-pub async fn download_contract_abi_file() -> Result<(), ()> {
-  dotenv::dotenv().ok();
-  let shimmer_evm_explorer: String = env::var("SHIMMER_EVM_EXPLORER").unwrap();
-  let contract_address = env::var("IDENTITY_SC_ADDRESS").unwrap();
-
-  let url = String::from(shimmer_evm_explorer + "/api?module=contract&action=getabi&address=" + &contract_address);
-  log::info!("Downloading ABI from {}", url);
-  let body = reqwest::get(url)
-    .await.unwrap()
-    .text()
-    .await.unwrap();
-
-  let mut file = File::create("../abi/idsc_abi.json.").unwrap();
-  let correct_json: AbiDTO = serde_json::from_str(&body).unwrap();
-  file.write_all(correct_json.result.as_bytes()).unwrap();
-
-  Ok(())
-}
-
-pub fn is_abi_downloaded() -> bool {
-  let env_path = env::var("ABI_LOCAL_PATH").unwrap();
-  let path = Path::new(&env_path);
-  if path.exists() == true && path.metadata().unwrap().len() > 0 {
-      return true
-  };  
-  return false;
-}
-
-pub fn get_abi_from_file() -> String {
-  let abi = if is_abi_downloaded() == false {
-    "".to_string()
-  } else {
-    let env_path = env::var("ABI_LOCAL_PATH").unwrap();
-    let path = Path::new(&env_path);
-    let mut file = File::open(path).unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    data
-  };
-  abi
 }
 
 pub fn convert_string_to_iotadid(did: String) -> IotaDID {

@@ -6,10 +6,3 @@ CREATE TABLE identity(
 CREATE TABLE verifiable_credential(
     id SERIAL PRIMARY KEY
 );
-
--- CREATE TABLE holder_request(
---     vchash text PRIMARY KEY,
---     did text NOT NULL,
---     request_expiration text NOT NULL,
---     vc text NOT NULL
--- );
