@@ -4,7 +4,7 @@ CREATE TABLE identity(
 );
 
 CREATE TABLE verifiable_credential(
-    id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY
 );
 
 -- CREATE TABLE holder_request(

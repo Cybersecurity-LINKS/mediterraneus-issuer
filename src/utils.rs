@@ -27,7 +27,7 @@ pub async fn setup_secret_manager() -> SecretManager {
     dotenv::dotenv().ok();
     let mut ss = StrongholdSecretManager::builder()
     .password(&env::var("STRONGHOLD_PASSWORD").unwrap())
-    .build(PathBuf::from("../wallet.stronghold")).unwrap();
+    .build(PathBuf::from("./wallet.stronghold")).unwrap();
 
     let mnemonic = &env::var("NON_SECURE_MNEMONIC").unwrap();
     // let mnemonic = iota_client::generate_mnemonic().unwrap();

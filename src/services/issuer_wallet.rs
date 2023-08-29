@@ -21,7 +21,7 @@ pub async fn create_or_load_wallet_account() -> Result<(AccountManager, AccountH
 
     let manager = AccountManager::builder()
         .with_secret_manager(secret_manager)
-        .with_storage_path(PathBuf::from("../walletdb").to_str().unwrap())
+        .with_storage_path(PathBuf::from("./walletdb").to_str().unwrap())
         .with_client_options(client_options)
         .with_coin_type(SHIMMER_COIN_TYPE)
         .finish()
