@@ -1,9 +1,9 @@
 use actix_web::{web, HttpResponse, Responder, post, get, put, http::header::ContentType};
 use deadpool_postgres::Pool;
 use ethers::utils::hex::FromHex;
-use identity_iota::{crypto::Ed25519, core::ToJson};
+use identity_iota::{crypto::Ed25519, core::ToJson, credential::Credential};
 use iota_client::crypto::signatures::ed25519::{PublicKey, Signature};
-use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc}}, 
+use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc, is_revoked}}, 
             IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::{ReqVCInitDTO, ReqVCRevocation}};
 use crate::db::{models::Identity, operations::check_vc_is_present};
 
@@ -78,7 +78,26 @@ async fn revoke_verifiable_credential(
 
 
 // TODO: verify if credential revoked
+#[post("/check")]
+async fn check_credential_revocation(
+    vc: web::Json<Credential>,
+    issuer_state: web::Data<IssuerState>) -> impl Responder {
 
+    let check_result = is_revoked(vc.0, &issuer_state.issuer_identity, issuer_state.issuer_account.client()).await;
+
+    let ret = match check_result {
+        Ok(value) => {
+            if value {
+                return HttpResponse::Ok().body("Credential is Revoked!");
+            } else {
+                return HttpResponse::Ok().body("Credential is Valid!");
+            }
+        },
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string())
+    };
+
+    ret
+}
 
 #[get("/{sentence}")]
 async fn echo_api(path: web::Path<String>) -> impl Responder {
@@ -91,6 +110,7 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
         web::scope("/identity")
             .service(create_verifiable_credential)
             .service(revoke_verifiable_credential)
+            .service(check_credential_revocation)
             .service(echo_api)
     );
 }

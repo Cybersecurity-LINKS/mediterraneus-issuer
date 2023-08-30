@@ -1,4 +1,4 @@
-use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::Service, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}};
+use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status, ValidationError}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::Service, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}};
 use iota_client::{Client, block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, secret::SecretManager};
 use serde_json::json;
 
@@ -73,3 +73,26 @@ pub async fn revoke_vc(credential_index: i32, issuer_identity: &Identity, client
     Ok(())
 }
 
+
+pub async fn is_revoked(credential: Credential, issuer_identity: &Identity, client: &Client) -> anyhow::Result<bool> {
+    let issuer_document = resolve_did(client, issuer_identity.did.clone()).await?;
+
+    let validation_result = CredentialValidator::validate(
+        &credential,
+        &issuer_document,
+        &CredentialValidationOptions::default(),
+        FailFast::FirstError,
+    );
+
+    if validation_result.is_ok() {
+        return Ok(false)
+    }
+    
+    // We expect validation to no longer succeed because the credential was revoked.
+    let result = matches!(
+    validation_result.unwrap_err().validation_errors[0],
+    ValidationError::Revoked
+    );
+
+    Ok(result)
+}
