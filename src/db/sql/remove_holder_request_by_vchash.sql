@@ -1,1 +1,0 @@
-DELETE FROM holder_request WHERE vchash=$1;
