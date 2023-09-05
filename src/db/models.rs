@@ -13,3 +13,11 @@ pub struct Identity {
 pub struct VerifiableCredential {
     pub id: i32
 }
+
+#[derive(Deserialize, PostgresMapper, Serialize, Clone, Debug)]
+#[pg_mapper(table = "challenge")] 
+pub struct ChallengeRequest {
+    pub did: String,
+    pub challenge: String,
+    pub expiration: String
+}

@@ -3,8 +3,8 @@ use deadpool_postgres::Pool;
 use ethers::utils::hex::FromHex;
 use identity_iota::{crypto::Ed25519, core::ToJson, credential::Credential};
 use iota_client::crypto::signatures::ed25519::{PublicKey, Signature};
-use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc, is_revoked}}, 
-            IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::{ReqVCInitDTO, ReqVCRevocation}};
+use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc, is_revoked, generate_challenge}}, 
+            IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::{ReqVCorChallenge, ReqVCRevocation, ChallengeDTO}};
 use crate::db::{models::Identity, operations::check_vc_is_present};
 
 /// Store did with expiration so that the client should resend the signatures in a short time.
@@ -14,8 +14,8 @@ use crate::db::{models::Identity, operations::check_vc_is_present};
 /// @param res --> 200, 400, 500
 
 #[post("")]
-async fn create_verifiable_credential(
-    req_body: web::Json<ReqVCInitDTO>, 
+async fn request_verifiable_credential(
+    req_body: web::Json<ReqVCorChallenge>, 
     pool: web::Data<Pool>,
     issuer_state: web::Data<IssuerState>) -> impl Responder {
 
@@ -70,14 +70,11 @@ async fn revoke_verifiable_credential(
         Err(_) => HttpResponse::BadRequest().body("Not a valid VC id".to_string())
     };
 
-
-    // let result = revoke_vc(vc_id.vc_id, &issuer_state.issuer_identity, issuer_state.issuer_account.client());
     result
 
 }
 
 
-// TODO: verify if credential revoked
 #[post("/check")]
 async fn check_credential_revocation(
     vc: web::Json<Credential>,
@@ -99,18 +96,37 @@ async fn check_credential_revocation(
     ret
 }
 
+#[post("/challenge")]
+async fn request_challenge(
+    req_body: web::Json<ReqVCorChallenge>, 
+    pool: web::Data<Pool>,) -> impl Responder {
+
+    let challenge = generate_challenge(pool.get_ref().to_owned(), req_body.did.clone()).await;
+    match challenge {
+        Ok(challenge) => {
+            let response = ChallengeDTO{challenge: challenge.challenge, expiration: challenge.expiration};
+            HttpResponse::Ok().insert_header(ContentType::json()).json(response)
+        },
+        Err(_) => HttpResponse::InternalServerError().body("Failed to get a challenge!")
+    }
+    
+}
+
+
 #[get("/{sentence}")]
 async fn echo_api(path: web::Path<String>) -> impl Responder {
     HttpResponse::Ok().body(path.into_inner())
 }
 
+
 pub fn scoped_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
          // prefixes all resources and routes attached to it...
         web::scope("/identity")
-            .service(create_verifiable_credential)
+            .service(request_verifiable_credential)
             .service(revoke_verifiable_credential)
             .service(check_credential_revocation)
+            .service(request_challenge)
             .service(echo_api)
     );
 }

@@ -22,14 +22,20 @@ pub fn setup_client() -> Client {
         .unwrap()
 }
 
-pub async fn setup_secret_manager() -> SecretManager {
+pub async fn setup_secret_manager(reset: Option<bool>) -> SecretManager {
     dotenv::dotenv().ok();
+
+    let reset = reset.unwrap_or(false);
     let mut ss = StrongholdSecretManager::builder()
     .password(&env::var("STRONGHOLD_PASSWORD").unwrap())
     .build(PathBuf::from("./wallet.stronghold")).unwrap();
 
-    let mnemonic = &env::var("NON_SECURE_MNEMONIC").unwrap();
-    // let mnemonic = iota_client::generate_mnemonic().unwrap();
+    let mnemonic: String; 
+    if reset {
+      mnemonic = iota_client::generate_mnemonic().unwrap();
+    } else {
+      mnemonic = env::var("NON_SECURE_MNEMONIC").unwrap();
+    }
 
     // Only required the first time, can also be generated with `manager.generate_mnemonic()?`
     // The mnemonic only needs to be stored the first time
@@ -39,9 +45,12 @@ pub async fn setup_secret_manager() -> SecretManager {
         Err(error) => panic!("Error: {:?}", error)
     }
  
-    // log::info!("Mnemonic generated {}. Save it.", mnemonic);
+    if reset {
+      log::info!("Mnemonic generated {}. Save it.", mnemonic);
+    }
     SecretManager::Stronghold(ss)
 }
+
 
 /// Requests funds from the faucet for the given `address`.
 async fn request_faucet_funds(
@@ -131,3 +140,4 @@ pub fn get_vc_id_from_credential(vc: Credential) -> i64 {
 pub fn remove_0x_prefix(hex_string: String) -> String {
   hex_string.strip_prefix("0x").unwrap().to_string()
 }
+

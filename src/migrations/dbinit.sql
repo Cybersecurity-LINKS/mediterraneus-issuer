@@ -6,3 +6,9 @@ CREATE TABLE identity(
 CREATE TABLE verifiable_credential(
     id SERIAL PRIMARY KEY
 );
+
+CREATE TABLE challenge (
+    did text PRIMARY KEY,
+    challenge text NOT NULL,
+    expiration text NOT NULL
+)

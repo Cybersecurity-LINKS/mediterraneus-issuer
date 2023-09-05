@@ -1,10 +1,11 @@
 use std::vec;
 use deadpool_postgres::Client;
+use identity_iota::core::Timestamp;
 use tokio_pg_mapper::FromTokioPostgresRow;
 
 use crate::{db::models::Identity, errors::my_errors::MyError};
 
-use super::models::VerifiableCredential;
+use super::models::{VerifiableCredential, ChallengeRequest};
 
 pub async fn get_identity_did(client: &Client) -> Result<Identity, MyError> {
     let stmt = include_str!("./sql/get_identity_did.sql");
@@ -80,4 +81,75 @@ pub async fn check_vc_is_present(client: &Client, vc_id: i32) -> Result<(), MyEr
     } else {
         Ok(())
     }
+}
+
+pub async fn get_challenge_req(client: &Client, did: String) ->  Result<ChallengeRequest, MyError> {
+    let _stmt = include_str!("./sql/get_challenge_request.sql");
+    let _stmt = _stmt.replace("$table_fields", &ChallengeRequest::sql_table_fields());
+    let stmt = client.prepare(&_stmt).await.unwrap();
+
+    let challenge_req = match client.query_one(
+        &stmt, 
+        &[
+            &did
+        ],
+    ).await {
+        Ok(challenge_req_row) => ChallengeRequest::from_row_ref(&challenge_req_row).unwrap(),
+        Err(db_error) => {
+            log::info!("Issuer identity not present in DB: {:?}", db_error);
+            // ChallengeRequest {did: "".to_string(), challenge: "".to_string(), expiration: "".to_string()}
+            return Err(MyError::NotFound)
+        },
+    };
+        
+    Ok(challenge_req)
+}
+
+pub async fn update_challenge_req(client: &Client, did: String, challenge: String, expiration: Timestamp) -> Result<ChallengeRequest, MyError> {
+    let _stmt = include_str!("./sql/update_challenge_request.sql");
+    let _stmt = _stmt.replace("$table_fields", &ChallengeRequest::sql_table_fields());
+    let stmt = client.prepare(&_stmt).await.unwrap();
+
+    let challenge_req = match client.query_one(
+        &stmt, 
+        &[
+            &did,
+            &challenge,
+            &expiration.to_rfc3339()
+        ],
+    ).await {
+        Ok(challenge_req_row) => ChallengeRequest::from_row_ref(&challenge_req_row).unwrap(),
+        Err(db_error) => {
+            log::info!("Issuer identity not present in DB: {:?}", db_error);
+            // ChallengeRequest {did: "".to_string(), challenge: "".to_string(), expiration: "".to_string()}
+            return Err(MyError::NotFound)
+        },
+    };
+        
+    Ok(challenge_req)
+}
+
+
+pub async fn insert_challenge_req(client: &Client, did: String, challenge: String, expiration: Timestamp) -> Result<ChallengeRequest, MyError> {
+    let _stmt = include_str!("./sql/insert_challenge_request.sql");
+    let _stmt = _stmt.replace("$table_fields", &ChallengeRequest::sql_table_fields());
+    let stmt = client.prepare(&_stmt).await.unwrap();
+
+    let challenge_req = match client.query_one(
+        &stmt, 
+        &[
+            &did,
+            &challenge,
+            &expiration.to_rfc3339()
+        ],
+    ).await {
+        Ok(challenge_req_row) => ChallengeRequest::from_row_ref(&challenge_req_row).unwrap(),
+        Err(db_error) => {
+            log::info!("Issuer identity not present in DB: {:?}", db_error);
+            // ChallengeRequest {did: "".to_string(), challenge: "".to_string(), expiration: "".to_string()}
+            return Err(MyError::NotFound)
+        },
+    };
+        
+    Ok(challenge_req)
 }

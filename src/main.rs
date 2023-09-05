@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let client = setup_client();
     let faucet_endpoint = env::var("FAUCET_URL").expect("$FAUCET_URL must be set");
 
-    let (account_manager, account) = issuer_wallet::create_or_load_wallet_account().await?;
+    let (account_manager, account) = issuer_wallet::create_or_load_wallet_account(None).await?;
     let wallet_address = account.addresses().await?[0].address().clone();
 
     ensure_address_has_funds(&client.clone(), wallet_address.as_ref().clone(), &faucet_endpoint.clone()).await?;
@@ -32,6 +32,8 @@ async fn main() -> anyhow::Result<()> {
     let issuer_identity = issuer_identity::create_identity(
         &client.clone(), wallet_address.as_ref().clone(), &mut *secret_manager.write().await, pool.clone())
         .await?;
+
+    log::info!("Issuer DID: {}", issuer_identity.did);
 
     log::info!("Starting up on {}:{}", address, port);
     HttpServer::new(move || {

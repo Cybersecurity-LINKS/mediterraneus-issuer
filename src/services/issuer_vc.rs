@@ -1,9 +1,10 @@
+use deadpool_postgres::Pool;
 use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status, ValidationError}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::Service, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}};
-use iota_client::{Client, block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, secret::SecretManager};
+use iota_client::{Client, block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, secret::SecretManager, crypto::utils::rand::fill};
 use serde_json::json;
 
 
-use crate::{db::models::Identity, errors::my_errors::MyError};
+use crate::{db::{models::{Identity, ChallengeRequest}, operations::{get_challenge_req, update_challenge_req, insert_challenge_req}}, errors::my_errors::MyError};
 
 use super::issuer_identity::resolve_did;
 
@@ -96,3 +97,41 @@ pub async fn is_revoked(credential: Credential, issuer_identity: &Identity, clie
 
     Ok(result)
 }
+
+
+pub async fn generate_challenge(pool: Pool, did: String) -> anyhow::Result<ChallengeRequest>{
+
+    let challenge_req = get_challenge_req(&pool.get().await.unwrap(), did.clone()).await;
+    let challenge = match challenge_req {
+        Ok(challenge_req) => {
+                // check that it is not expired, if expired update db with a new one
+            let holder_request_timestamp = Timestamp::parse(&challenge_req.clone().expiration).unwrap();
+            let challenge =  if holder_request_timestamp < Timestamp::now_utc() {
+                // request expired --> update with new challenge
+                let mut challenge = [0u8; 32];
+                fill(&mut challenge)?;
+                let expiration = Timestamp::now_utc().checked_add(Duration::minutes(1)).unwrap();
+                let challenge = update_challenge_req(&pool.get().await.unwrap(), did, hex::encode(challenge), expiration ).await?;
+                challenge
+            } else {
+                // request still not expired --> stop handler from continuing
+                challenge_req
+            };
+
+            challenge
+        },
+        Err(e) => {
+            //request not present -> insert new challenge request into db
+            let mut challenge = [0u8; 32];
+            fill(&mut challenge)?;
+            let expiration = Timestamp::now_utc().checked_add(Duration::minutes(1)).unwrap();
+            let challenge = insert_challenge_req(&pool.get().await.unwrap(), did, hex::encode(challenge), expiration).await?;
+            challenge
+        }
+    };
+
+
+    Ok(challenge)
+}
+
+

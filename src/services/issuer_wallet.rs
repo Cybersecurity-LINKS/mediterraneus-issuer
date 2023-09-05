@@ -9,9 +9,9 @@ use crate::utils::{setup_secret_manager, setup_client_options};
 /// creates or loads the issuer's wallet account. It also ensures that the main account address ([0]) has 
 /// funds. Funds are obtained from the faucet. If no funds are given to the account's address 
 /// the issuer cannot publish new DIDs, hence he cannot create its SSI.
-pub async fn create_or_load_wallet_account() -> Result<(AccountManager, AccountHandle)> {
+pub async fn create_or_load_wallet_account(reset: Option<bool>) -> Result<(AccountManager, AccountHandle)> {
     dotenv::dotenv().ok();
-    let secret_manager = setup_secret_manager().await;
+    let secret_manager = setup_secret_manager(reset).await;
     let client_options = setup_client_options();
 
     let manager = AccountManager::builder()

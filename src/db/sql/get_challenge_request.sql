@@ -1,0 +1,1 @@
+SELECT $table_fields FROM challenge WHERE did=$1;

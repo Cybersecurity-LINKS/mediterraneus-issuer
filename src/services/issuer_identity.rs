@@ -62,6 +62,7 @@ pub async fn create_identity(client: &Client, wallet_address: Address, secret_ma
 
     // Insert new identity in the DB
     let new_issuer_identity = Identity { did: document.id().to_string(), privkey: keypair.private().as_ref().to_vec() };
+    
     insert_identity_issuer(&pool.get().await.unwrap(), new_issuer_identity.clone()).await?;
     Ok(new_issuer_identity)
 }  

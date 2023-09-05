@@ -1,9 +1,11 @@
+use identity_iota::core::Timestamp;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
-pub struct ReqVCInitDTO {
+pub struct ReqVCorChallenge {
     pub did: String
 }
+
 
 #[derive(Deserialize, Serialize)]
 pub struct ReqVCRevocation {
@@ -11,4 +13,8 @@ pub struct ReqVCRevocation {
 }
 
 
-
+#[derive(Deserialize, Serialize)]
+pub struct ChallengeDTO {
+    pub challenge: String,
+    pub expiration: String
+}
