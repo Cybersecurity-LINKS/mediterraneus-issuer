@@ -1,9 +1,9 @@
 use actix_web::{web, HttpResponse, Responder, post, get, put, http::header::ContentType};
 use deadpool_postgres::Pool;
 use ethers::utils::hex::FromHex;
-use identity_iota::{crypto::Ed25519, core::ToJson, credential::Credential};
+use identity_iota::{crypto::Ed25519, core::ToJson, credential::{Credential, Presentation}};
 use iota_client::crypto::signatures::ed25519::{PublicKey, Signature};
-use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc, is_revoked, generate_challenge}}, 
+use crate::{services::{issuer_identity::resolve_did, issuer_vc::{create_vc, revoke_vc, is_revoked, generate_challenge, verify_vp}}, 
             IssuerState, utils::extract_pub_key_from_doc, db::operations::insert_vc, dtos::identity_dtos::{ReqVCorChallenge, ReqVCRevocation, ChallengeDTO}};
 use crate::db::{models::Identity, operations::check_vc_is_present};
 
@@ -109,6 +109,38 @@ async fn request_challenge(
         },
         Err(_) => HttpResponse::InternalServerError().body("Failed to get a challenge!")
     }
+    
+}
+
+async fn revoke_verifiable_credential_holder(
+    req_body: web::Json<Presentation>, 
+    pool: web::Data<Pool>,
+    issuer_state: web::Data<IssuerState>) -> impl Responder {
+
+    //Presentation verify
+    let verify = verify_vp(req_body.0, pool.get_ref().to_owned(), issuer_state.issuer_account.client().clone()).await;
+    if verify.is_err() {
+        HttpResponse::BadRequest().body("Revocation Failed!")
+    } else {
+        //Revocation
+        let vc_id = req_body.0.verifiable_credential.first().unwrap().id.unwrap().to_string().strip_prefix("https://example.edu/credentials/").unwrap().parse::<i32>().unwrap().clone();
+
+        let check = check_vc_is_present(&pool.get().await.unwrap(), vc_id.clone()).await;
+
+        let response = match check {
+            Ok(_) => {
+                let sm = issuer_state.secret_manager.read().await;
+                let revoked = revoke_vc(vc_id.clone(), &issuer_state.issuer_identity, issuer_state.issuer_account.client(), &sm).await;
+                match revoked {
+                    Ok(_) => HttpResponse::Ok().body("Credential Revoked!"),
+                    Err(e) => HttpResponse::InternalServerError().body(e.to_string())
+                }
+            },
+            Err(_) => HttpResponse::BadRequest().body("Not a valid VC id".to_string())
+        };
+        response
+    }
+
     
 }
 

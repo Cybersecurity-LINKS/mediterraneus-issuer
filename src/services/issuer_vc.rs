@@ -1,5 +1,7 @@
+use std::ops::Deref;
+
 use deadpool_postgres::Pool;
-use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status, ValidationError}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::Service, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}};
+use identity_iota::{core::{Timestamp, FromJson, Url, ToJson, Duration}, credential::{Credential, Subject, CredentialBuilder, CredentialValidator, CredentialValidationOptions, FailFast, RevocationBitmap, RevocationBitmapStatus, Status, ValidationError, Presentation, PresentationValidationOptions, SubjectHolderRelationship}, crypto::{PrivateKey, ProofOptions}, did::{DIDUrl, DID}, document::{Service, verifiable::VerifierOptions}, prelude::{IotaDocument, IotaIdentityClientExt, IotaClientExt}, resolver::Resolver};
 use iota_client::{Client, block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, secret::SecretManager, crypto::utils::rand::fill};
 use serde_json::json;
 
@@ -130,8 +132,65 @@ pub async fn generate_challenge(pool: Pool, did: String) -> anyhow::Result<Chall
         }
     };
 
-
     Ok(challenge)
+}
+
+
+pub async fn verify_vp(presentation: Presentation, pool: Pool, client: Client) -> anyhow::Result<(),()>{
+    let holder_did = presentation.holder.as_ref().unwrap().to_string();
+    let challenge_req = get_challenge_req(&pool.get().await.unwrap(), holder_did).await;
+    let result = match challenge_req {
+        Ok(challenge_req) => {
+                // check that it is not expired, if expired update db with a new one
+            let holder_request_timestamp = Timestamp::parse(&challenge_req.clone().expiration).unwrap();
+            let res = if holder_request_timestamp < Timestamp::now_utc() {
+                Err(())
+            } else {
+                // request still not expired 
+                let presentation_verifier_options: VerifierOptions = VerifierOptions::new()
+                    .challenge(challenge_req.challenge.to_owned())
+                    .allow_expired(false);
+
+                // Do not allow credentials that expire within the next 10 hours.
+                let credential_validation_options: CredentialValidationOptions = CredentialValidationOptions::default()
+                    .earliest_expiry_date(Timestamp::now_utc().checked_add(Duration::hours(10)).unwrap());
+
+                let presentation_validation_options = PresentationValidationOptions::default()
+                    .presentation_verifier_options(presentation_verifier_options)
+                    .shared_validation_options(credential_validation_options)
+                    .subject_holder_relationship(SubjectHolderRelationship::AlwaysSubject);
+
+                // Resolve issuer and holder documents and verify presentation.
+                // Passing the holder and issuer to `verify_presentation` will bypass the resolution step.
+                let mut resolver: Resolver<IotaDocument> = Resolver::new();
+                resolver.attach_iota_handler(client);
+                let res = resolver
+                    .verify_presentation(
+                    &presentation,
+                    &presentation_validation_options,
+                    FailFast::FirstError,
+                    None,
+                    None,
+                    )
+                    .await;
+
+                if res.is_ok() {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+
+                // Ok(())
+                // res
+            };
+            res
+        },
+        Err(_) => {
+            Err(())
+        }
+    };
+
+    result
 }
 
 
