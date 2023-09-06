@@ -122,33 +122,14 @@ async fn main() -> anyhow::Result<()> {
 
     log::info!("Presentiation: \n {}", presentation.to_json_pretty()?.to_colored_json_auto()?);
 
-
-    let presentation_verifier_options: VerifierOptions = VerifierOptions::new()
-    .challenge(challenge.to_owned())
-    .allow_expired(false);
-
-    // Do not allow credentials that expire within the next 10 hours.
-    let credential_validation_options: CredentialValidationOptions = CredentialValidationOptions::default()
-        .earliest_expiry_date(Timestamp::now_utc().checked_add(Duration::hours(10)).unwrap());
-
-    let presentation_validation_options = PresentationValidationOptions::default()
-        .presentation_verifier_options(presentation_verifier_options)
-        .shared_validation_options(credential_validation_options)
-        .subject_holder_relationship(SubjectHolderRelationship::AlwaysSubject);
-
-    // Resolve issuer and holder documents and verify presentation.
-    // Passing the holder and issuer to `verify_presentation` will bypass the resolution step.
-    let mut resolver: Resolver<IotaDocument> = Resolver::new();
-    resolver.attach_iota_handler(client);
-    resolver
-        .verify_presentation(
-        &presentation,
-        &presentation_validation_options,
-        FailFast::FirstError,
-        None,
-        None,
-        )
+    //Revoke
+    let url = "http://".to_owned() + &env::var("ADDR").expect("$ADDR must be set") + ":" + &env::var("PORT").expect("$PORT must be set") + "/api/identity/revoke/holder";
+    let res = req_client.post(url)
+        .json(&presentation)
+        .send()
         .await?;
+
+    log::info!("Revocation response: \n {}", res.text().await?);
 
     Ok(())
 }

@@ -136,7 +136,7 @@ pub async fn generate_challenge(pool: Pool, did: String) -> anyhow::Result<Chall
 }
 
 
-pub async fn verify_vp(presentation: Presentation, pool: Pool, client: Client) -> anyhow::Result<(),()>{
+pub async fn verify_vp(presentation: &Presentation, pool: Pool, client: Client) -> anyhow::Result<(),()>{
     let holder_did = presentation.holder.as_ref().unwrap().to_string();
     let challenge_req = get_challenge_req(&pool.get().await.unwrap(), holder_did).await;
     let result = match challenge_req {

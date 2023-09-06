@@ -112,20 +112,21 @@ async fn request_challenge(
     
 }
 
+#[post("revoke/holder")]
 async fn revoke_verifiable_credential_holder(
     req_body: web::Json<Presentation>, 
     pool: web::Data<Pool>,
     issuer_state: web::Data<IssuerState>) -> impl Responder {
 
     //Presentation verify
-    let verify = verify_vp(req_body.0, pool.get_ref().to_owned(), issuer_state.issuer_account.client().clone()).await;
+    let verify = verify_vp(&req_body.0, pool.get_ref().to_owned(), issuer_state.issuer_account.client().clone()).await;
     if verify.is_err() {
         HttpResponse::BadRequest().body("Revocation Failed!")
     } else {
         //Revocation
-        let vc_id = req_body.0.verifiable_credential.first().unwrap().id.unwrap().to_string().strip_prefix("https://example.edu/credentials/").unwrap().parse::<i32>().unwrap().clone();
+        let vc_id = req_body.0.verifiable_credential.first().unwrap().id.as_ref().unwrap().to_string().strip_prefix("https://example.edu/credentials/").unwrap().parse::<i32>().unwrap();
 
-        let check = check_vc_is_present(&pool.get().await.unwrap(), vc_id.clone()).await;
+        let check = check_vc_is_present(&pool.get().await.unwrap(), vc_id).await;
 
         let response = match check {
             Ok(_) => {
@@ -159,6 +160,7 @@ pub fn scoped_config(cfg: &mut web::ServiceConfig) {
             .service(revoke_verifiable_credential)
             .service(check_credential_revocation)
             .service(request_challenge)
+            .service(revoke_verifiable_credential_holder)
             .service(echo_api)
     );
 }
