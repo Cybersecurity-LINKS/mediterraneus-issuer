@@ -51,6 +51,6 @@ pub async fn init(configuration: DatabaseConfig) -> Result<Pool> {
     let pool = config.create_pool(None, NoTls)?;
     log::info!("pool database");
 
-    tokio::task::spawn(cleanup_loop(pool.clone()));
+    tokio::spawn(cleanup_loop(pool.clone()));
     Ok(pool)
 }

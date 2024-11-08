@@ -26,9 +26,6 @@ use crate::repository::operations::HoldersChallengesExt;
 use crate::utils::eth::{update_identity_sc, SignerMiddlewareShort};
 use crate::utils::iota::{create_credential, IotaState};
 
-// use actix_web_lab::middleware::from_fn;
-// use crate::middlewares::ver_presentation_jwt::verify_presentation_jwt;
-
 #[post("/credentials")]
 async fn issue_credential (
     req_body: web::Json<CredentialRequestDTO>, 
@@ -102,7 +99,7 @@ async fn issue_credential (
 
     wallet_sign.verify(holder_request.challenge.clone(), address)?;
     log::info!("Wallet signature verification success!");
-    
+
     // Update Identity SC, addUser 
     update_identity_sc(
         identity_sc, 
